@@ -124,9 +124,67 @@ def get_alpacaeval(split: str, human_prefix: str, human_suffix: str, assistant_p
     return data
 
 
+# def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: str, assistant_suffix: str) -> Dataset:
+#     """
+#     Load the Stanford Human Preferences dataset from Huggingface and convert it into to a Dataset.
+
+#     We filter preference pairs to only keep pairs where the score ratio is at least 2 (as in original SHP).
+#     For this dataset, the SFT text is the first response in SHP for a given prompt. 
+#     This is because the globally best response cannot be inferred from SHP, but all responses are a good option because they have a positive score.
+
+#     As recommended in the SteamSHPs' (reward models) data cards:
+#         Maximum number of pairs per prompt is 5 (in the training data, to avoid overfitting).
+#         Minimum score ratio of preferred to dispreferred response is 2
+
+#     Args:
+#         - split: one of 'test', 'train'
+#         - human_prefix: marks start of human turn ('<|user|>' is the recommended choice and is set in config.yaml)
+#         - human_suffix: marks end of human turn ('' is the recommended choice and is set in config.yaml)
+#         - assistant_prefix: marks start of human turn ('<|assistant|>' is the recommended choice and is set in config.yaml)
+#         - assistant_suffix: marks end of human turn ('' is the recommended choice and is set in config.yaml)
+
+#     Returns:   
+#         A Dataset instance.
+#     """
+#     MAX_PAIRS_PER_PROMPT = 5
+#     MIN_SCORE_RATIO = 2
+
+#     rank0_print(f'Loading SHP dataset ({split} split) from Huggingface...')
+#     dataset = datasets.load_dataset('stanfordnlp/SHP', split=split)
+#     if on_rank0():
+#         dataset = tqdm.tqdm(dataset, desc='Processing SHP')
+
+#     data = Dataset('shp')
+
+#     for row in dataset:
+#         prompt = human_prefix + row['history'] + human_suffix + assistant_prefix
+#         responses = [row['human_ref_A'] + assistant_suffix, row['human_ref_B'] + assistant_suffix]
+#         scores = [row['score_A'], row['score_B']]
+#         score_ratio = max(scores[0] / scores[1], scores[1] / scores[0])
+
+#         if score_ratio < MIN_SCORE_RATIO and split == 'train':
+#             continue
+
+#         i,j = data[prompt].num_generations(), data[prompt].num_generations() + 1
+#         data[prompt].prompt = prompt
+#         data[prompt].generations.extend(responses)
+#         data[prompt].pairs.append((i, j) if row['labels'] == 1 else (j, i))
+#         data[prompt].scores.extend(scores)
+#         data[prompt].truncation_mode = 'keep_start' # keep start for SHP because it's single-turn with long prompts
+#         data[prompt].sft_index = 0  # absolute best response cannot be inferred, so just pick the first
+#         data[prompt].dataset_name = 'shp'
+#         data[prompt].remove_extra_spaces()
+
+#     # prevent over-fitting
+#     if split == 'train':
+#         for prompt in data:
+#             data[prompt].pairs = random.sample(data[prompt].pairs, min(MAX_PAIRS_PER_PROMPT, len(data[prompt].pairs)))
+
+#     return data
+
 def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: str, assistant_suffix: str) -> Dataset:
     """
-    Load the Stanford Human Preferences dataset from Huggingface and convert it into to a Dataset.
+    Load the LLM Feedback dataset from csv file and convert it into to a Dataset.
 
     We filter preference pairs to only keep pairs where the score ratio is at least 2 (as in original SHP).
     For this dataset, the SFT text is the first response in SHP for a given prompt. 
@@ -149,36 +207,41 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
     MAX_PAIRS_PER_PROMPT = 5
     MIN_SCORE_RATIO = 2
 
-    rank0_print(f'Loading SHP dataset ({split} split) from Huggingface...')
-    dataset = datasets.load_dataset('stanfordnlp/SHP', split=split)
-    if on_rank0():
-        dataset = tqdm.tqdm(dataset, desc='Processing SHP')
+    rank0_print(f'Loading LLM Feedback dataset ({split} split) from CSV...')
+    dataset = pd.read_csv("train.csv")
+    # if on_rank0():
+    #     dataset = tqdm.tqdm(dataset, desc='Processing SHP')
 
     data = Dataset('shp')
+    nrows = len(dataset.index)
+    score_threshold = 2.0
+    
 
-    for row in dataset:
-        prompt = human_prefix + row['history'] + human_suffix + assistant_prefix
-        responses = [row['human_ref_A'] + assistant_suffix, row['human_ref_B'] + assistant_suffix]
-        scores = [row['score_A'], row['score_B']]
-        score_ratio = max(scores[0] / scores[1], scores[1] / scores[0])
+    for i in range(nrows):
+        row = dataset.iloc[i]
+        prompt = human_prefix + row['orig_instruction'] + human_suffix + assistant_prefix
+        responses = row['orig_response']
+        score = row['orig_score']         
+        desired = False if score <= score_threshold else True
+        
 
-        if score_ratio < MIN_SCORE_RATIO and split == 'train':
-            continue
-
-        i,j = data[prompt].num_generations(), data[prompt].num_generations() + 1
+        # i,j = data[prompt].num_generations(), data[prompt].num_generations() + 1
         data[prompt].prompt = prompt
-        data[prompt].generations.extend(responses)
-        data[prompt].pairs.append((i, j) if row['labels'] == 1 else (j, i))
-        data[prompt].scores.extend(scores)
+        data[prompt].generations.append(responses)
+        # data[prompt].pairs.append((i, j) if row['labels'] == 1 else (j, i))
+        data[prompt].scores = score
+        data[prompt].desirable.append(desired)
         data[prompt].truncation_mode = 'keep_start' # keep start for SHP because it's single-turn with long prompts
         data[prompt].sft_index = 0  # absolute best response cannot be inferred, so just pick the first
         data[prompt].dataset_name = 'shp'
         data[prompt].remove_extra_spaces()
+        print(data[prompt])
+        break
 
     # prevent over-fitting
-    if split == 'train':
-        for prompt in data:
-            data[prompt].pairs = random.sample(data[prompt].pairs, min(MAX_PAIRS_PER_PROMPT, len(data[prompt].pairs)))
+    # if split == 'train':
+    #     for prompt in data:
+    #         data[prompt].pairs = random.sample(data[prompt].pairs, min(MAX_PAIRS_PER_PROMPT, len(data[prompt].pairs)))
 
     return data
 
@@ -863,16 +926,15 @@ class ScoreUnaryDataLoader(UnpairedPreferenceDataLoader):
         for prompt in prompts:
             example = self.full_data[prompt]
 
-            if self.max_prompt_count:
-                example.pairs = random.sample(example.pairs, min(self.max_prompt_count, len(example.pairs)))
+            # if self.max_prompt_count:
+            #     example.pairs = random.sample(example.pairs, min(self.max_prompt_count, len(example.pairs)))
 
             # for oasst, lower scores are better, so rank 0 is the best response and rank n is the worst
-            if prev_status == 'rejected':
-                flat_data.append((example, example.generations[np.argmin(example.scores)], 'chosen'))
+            if example.desirable:
+                flat_data.append((example, example.generations, 'chosen'))
             else:
-                flat_data.append((example, example.generations[np.argmax(example.scores)], 'rejected'))
+                flat_data.append((example, example.generations, 'rejected'))
 
-            prev_status = flat_data[-1][-1]
 
         return flat_data
 
@@ -956,3 +1018,15 @@ class PairedPreferenceDataLoader(DataLoader):
             if self.n_epochs is not None and epoch_idx >= self.n_epochs:
                 done = True
                 break
+
+
+if __name__ == "__main__":
+    # data = get_shp('train','|user|','','|assistant|','')
+    dataloader = ScoreUnaryDataLoader(dataset_names=['shp'], tokenizer=None, n_examples=5)
+    # dataset_csv = pd.read_csv("train.csv")
+    # prompts = [dataset_csv.iloc[i]['orig_instruction'] for i in range(10)]
+
+    for data in dataloader:
+        print(data)
+        break
+    

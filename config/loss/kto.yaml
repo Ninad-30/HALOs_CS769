@@ -6,7 +6,7 @@ beta: 0.1
 
 trainer: KTOTrainer
 
-dataloader: UnpairedPreferenceDataLoader
+dataloader: ScoreUnaryDataLoader
 
 use_reference_model: true
 
