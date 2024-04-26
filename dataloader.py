@@ -209,6 +209,7 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
 
     rank0_print(f'Loading LLM Feedback dataset ({split} split) from CSV...')
     dataset = pd.read_csv("/content/drive/MyDrive/cs769csv/train.csv")
+    dataset = dataset[['orig_response', 'orig_instruction', 'orig_score']]
     dataset = dataset.dropna()
     if split == "train":
         data_split = dataset.sample(frac=0.8, random_state=42)
@@ -891,7 +892,7 @@ class UnpairedPreferenceDataLoader(DataLoader):
                 example_queue.append(batch_element)
                 
                 print("created batch element")
-                
+
                 if len(example_queue) >= self.batch_size:
                     while len(batch) < self.batch_size:
                         batch.append(example_queue.pop(0))
