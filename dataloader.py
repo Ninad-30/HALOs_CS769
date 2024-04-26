@@ -943,9 +943,13 @@ class ScoreUnaryDataLoader(UnpairedPreferenceDataLoader):
 
             # for oasst, lower scores are better, so rank 0 is the best response and rank n is the worst
             if example.desirable:
-                flat_data.append((example, example.generations, 'chosen'))
+                print(example)
+                print(example.generations)
+                flat_data.append((example, example.generations[0], 'chosen'))
             else:
-                flat_data.append((example, example.generations, 'rejected'))
+                print(example)
+                print(example.generations)
+                flat_data.append((example, example.generations[0], 'rejected'))
 
 
         return flat_data
