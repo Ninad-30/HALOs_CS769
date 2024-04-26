@@ -208,8 +208,9 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
     MIN_SCORE_RATIO = 2
 
     rank0_print(f'Loading LLM Feedback dataset ({split} split) from CSV...')
-    dataset = pd.read_csv("train.csv")
+    dataset = pd.read_csv("/content/drive/MyDrive/cs769csv/train.csv")
     dataset = dataset.dropna()
+    
     # if on_rank0():
     #     dataset = tqdm.tqdm(dataset, desc='Processing SHP')
 
