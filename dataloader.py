@@ -210,7 +210,11 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
     rank0_print(f'Loading LLM Feedback dataset ({split} split) from CSV...')
     dataset = pd.read_csv("/content/drive/MyDrive/cs769csv/train.csv")
     dataset = dataset.dropna()
-     
+    if split == "train":
+        data_split = dataset.sample(frac=0.8, random_state=42)
+    elif split == "test":
+        data_split = dataset.sample(frac=0.2, random_state=42)
+
     # if on_rank0():
     #     dataset = tqdm.tqdm(dataset, desc='Processing SHP')
 
@@ -220,7 +224,7 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
     
 
     for i in range(nrows):
-        row = dataset.iloc[i]
+        row = data_split.iloc[i]
         prompt = human_prefix + row['orig_instruction'] + human_suffix + assistant_prefix
         responses = row['orig_response']
         score = row['orig_score']         
@@ -923,7 +927,8 @@ class ScoreUnaryDataLoader(UnpairedPreferenceDataLoader):
         Assumes that there are a list of scores.
         """
         flat_data = []
-        prev_status = 'rejected'
+        # prev_status = 'rejected'
+        print("Creating flat data from ScoreUnaryDataLoader")
 
         for prompt in prompts:
             example = self.full_data[prompt]
