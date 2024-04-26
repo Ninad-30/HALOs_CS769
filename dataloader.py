@@ -501,6 +501,7 @@ class DataLoader:
         for name in dataset_names:
             dataset = globals()[f"get_{name}"](split, human_prefix, human_suffix, assistant_prefix, assistant_suffix)
             self.full_data.update(dataset.data)
+            print(self.full_data.keys()[:5])
 
     def collate(self, batch: Dict[str, List]) -> Dict:
         """
