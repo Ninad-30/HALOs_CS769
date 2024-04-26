@@ -493,6 +493,7 @@ class DataLoader:
         self.n_epochs = n_epochs
         self.epoch_idx = 0
         self.n_examples = n_examples
+        print("Creating Dataloader class")
         
         self.full_data = {}
 
