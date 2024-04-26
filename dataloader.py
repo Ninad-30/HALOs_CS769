@@ -883,7 +883,6 @@ class UnpairedPreferenceDataLoader(DataLoader):
             random.shuffle(flat_data)   # so generations in the same preference are not in the same batch
             batch = []
             example_queue = []
-            print("Itering over data")
 
             for example, generation, status in flat_data:
                 batch_element = self.tokenize_batch_element(example.prompt, generation, example.truncation_mode, prefix='target')
@@ -891,7 +890,6 @@ class UnpairedPreferenceDataLoader(DataLoader):
                 batch_element['truncation_mode'] = example.truncation_mode
                 example_queue.append(batch_element)
                 
-                print("created batch element")
 
                 if len(example_queue) >= self.batch_size:
                     while len(batch) < self.batch_size:
