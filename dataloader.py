@@ -209,6 +209,7 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
 
     rank0_print(f'Loading LLM Feedback dataset ({split} split) from CSV...')
     dataset = pd.read_csv("train.csv")
+    dataset = dataset.dropna()
     # if on_rank0():
     #     dataset = tqdm.tqdm(dataset, desc='Processing SHP')
 
