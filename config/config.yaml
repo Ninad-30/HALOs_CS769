@@ -23,7 +23,7 @@ fsdp_port: null
 wandb:
   enabled: true
   entity: null
-  project: "archangel"
+  project: "CS769-project-1May2024"
 
 # where trained models will be saved
 # use HF environmental variables to control where the datasets, pretrained Huggingface models, etc. are saved 
@@ -64,22 +64,22 @@ n_examples: null
 optimizer: RMSprop
 
 # number of linear warmup steps for the learning rate
-warmup_steps: 150
+warmup_steps: 2
 
 # evaluate and save model every eval_every steps
-eval_every: 20_000
+eval_every: 2
 
 
 ### EVALUATION SETTINGS
 
 # how many model samples to generate during sampling
-n_samples: 128
+n_samples: 2
 
 # where to dump samples
 samples_dir: "samples/"
 
 # the number of examples to evaluate on (leave as null to evaluate on all of them)
-n_eval_examples: 512
+n_eval_examples: 2
 
 # where the aligned policy model is stored
 saved_policy: null
