@@ -919,7 +919,10 @@ class UnpairedPreferenceDataLoader(DataLoader):
                         break
 
             epoch_idx += 1
-            if self.n_epochs is not None and epoch_idx >= self.n_epochs:
+            # if self.n_epochs is not None and epoch_idx >= self.n_epochs:
+            #     done = True
+            #     break
+            if epoch_idx >= self.n_epochs:
                 done = True
                 break
 
