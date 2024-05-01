@@ -209,7 +209,7 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
 
     rank0_print(f'Loading LLM Feedback dataset ({split} split) from CSV...')
     dataset = pd.read_csv("/content/drive/MyDrive/train.csv")
-    dataset = dataset[['orig_response', 'orig_instruction', 'orig_score']][:20]
+    dataset = dataset[['orig_response', 'orig_instruction', 'orig_score']][:1024]
     dataset = dataset.dropna()
     if split == "train":
         data_split = dataset.sample(frac=0.8, random_state=42)
