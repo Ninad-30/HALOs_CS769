@@ -336,7 +336,7 @@ class BasicTrainer(object):
 
     def train(self):
         """Begin either SFT or HALO training, with periodic evaluation. This is subclassed when implementing PPO."""
-        print("\n train me ghus gaye\n")
+
         rank0_print(f'Using {self.config.optimizer} optimizer with learning rate {self.config.lr}')
         self.optimizer = getattr(torch.optim, self.config.optimizer)(self.policy.parameters(), lr=self.config.lr)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lambda step: min(1.0, (step + 1) / (self.config.warmup_steps + 1)))
@@ -347,14 +347,10 @@ class BasicTrainer(object):
         last_log = None
         gradients_accumulated = 0
         batch_metrics = defaultdict(list)
-        print("\n entering batch loop \n")
-        print(f"train iter: {list(self.train_iterator)}")
+
         for batch in self.train_iterator:
-            print("Jai Shri Krishna")
-            print("\n emtered batch loop \n")
             # EVALUATION
-            # if self.example_counter % self.config.eval_every == 0 and (self.example_counter > 0 or self.config.do_first_eval):
-            if True:
+            if self.example_counter % self.config.eval_every == 0 and (self.example_counter > 0 or self.config.do_first_eval):
                 rank0_print(f'Running evaluation after {self.example_counter} train examples')
                 self.policy.eval()
 
@@ -366,11 +362,7 @@ class BasicTrainer(object):
                         _, eval_metrics = self.get_batch_metrics(local_eval_batch, mode='eval')
 
                     for k, v in eval_metrics.items():
-                        print(f"v type", v)
-                        try:
-                          all_eval_metrics[k].extend(v)
-                        except:
-                          all_eval_metrics[k].extend([v,])
+                        all_eval_metrics[k].extend(v)
 
                     delete_dict(local_eval_batch)
 
@@ -379,10 +371,8 @@ class BasicTrainer(object):
                     if len(v) > 0:
                         mean_eval_metrics[k] = sum(v) / len(v)
                 rank0_print(f'eval after {self.example_counter}: {formatted_dict(mean_eval_metrics)}')
-                print(f'eval after {self.example_counter}: {formatted_dict(mean_eval_metrics)}')
                
-                # if self.config.wandb.enabled and self.rank == 0:
-                if self.config.wandb.enabled:
+                if self.config.wandb.enabled and self.rank == 0:
                     wandb.log(mean_eval_metrics, step=self.example_counter)
 
                 if self.example_counter > 0:
@@ -406,11 +396,7 @@ class BasicTrainer(object):
             (loss / self.config.model.gradient_accumulation_steps).backward()
 
             for k, v in metrics.items():
-              try:
                 batch_metrics[k].extend(v)
-              except:
-                batch_metrics[k].extend([v,])
-
 
             gradients_accumulated += 1
             
@@ -489,8 +475,6 @@ class BasicTrainer(object):
             'state': state,
             'metrics': metrics if metrics is not None else {},
         }, output_path)
-        files.download(output_path)
-
     
     def save(self, output_dir: Optional[str] = None, metrics: Optional[Dict] = None, save_model_only: bool=True):
         """
@@ -849,14 +833,11 @@ class KTOTrainer(UnpairedPreferenceTrainer):
         log p_policy(y'|x) - log p_reference(y'|x). Doing so avoids the requirement that there be equal numbers of 
         desirable and undesirable examples in the microbatch.
         """
-        # KL = (policy_KL_logps - reference_KL_logps).mean().detach()
+        KL = (policy_KL_logps - reference_KL_logps).mean().detach()
         # nn.all_reduce sums up the KL estimates across all devices (gradient will also be scaled by world size)
-        # dist.nn.all_reduce(KL, op=dist.ReduceOp.SUM)
-        # # take average (will also scale gradients appropriately)
-        # KL = (KL / self.world_size).clamp(min=0)
-
-        KL = (policy_KL_logps - reference_KL_logps).mean().clamp(min=0)
-
+        dist.nn.all_reduce(KL, op=dist.ReduceOp.SUM)
+        # take average (will also scale gradients appropriately)
+        KL = (KL / self.world_size).clamp(min=0)
 
         if policy_chosen_logps.shape[0] != 0:
             chosen_logratios = (policy_chosen_logps - reference_chosen_logps)
@@ -962,10 +943,7 @@ class KTOTrainer(UnpairedPreferenceTrainer):
         metrics[f'rewards_{mode}/chosen'] = all_rewards[chosen_rewards_idx].float().cpu().numpy().tolist()
         metrics[f'rewards_{mode}/rejected'] = all_rewards[rejected_rewards_idx].float().cpu().numpy().tolist()
         metrics[f'rewards_{mode}/margins'] = [(all_rewards[chosen_rewards_idx].mean().nan_to_num(0) - all_rewards[rejected_rewards_idx].mean().nan_to_num(0)).item()]
-        # metrics[f'rewards_{mode}/KL_estimate'] = all_KL.float().detach().numpy().tolist()
-        
-        metrics[f'rewards_{mode}/KL_estimate'] = all_KL.item()
-
+        metrics[f'rewards_{mode}/KL_estimate'] = all_KL.float().cpu().numpy().tolist()
         metrics[f'loss/{mode}'] = all_devices_losses.float().cpu().numpy().tolist()
 
         del policy_chosen_logps, policy_rejected_logps, policy_KL_logps, reference_chosen_logps, reference_rejected_logps, reference_KL_logps

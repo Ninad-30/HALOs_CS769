@@ -208,8 +208,8 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
     MIN_SCORE_RATIO = 2
 
     rank0_print(f'Loading LLM Feedback dataset ({split} split) from CSV...')
-    dataset = pd.read_csv("/content/drive/MyDrive/train.csv")
-    dataset = dataset[['orig_response', 'orig_instruction', 'orig_score']][:20]
+    dataset = pd.read_csv("/content/drive/MyDrive/cs769csv/train.csv")
+    dataset = dataset[['orig_response', 'orig_instruction', 'orig_score']][:200]
     dataset = dataset.dropna()
     if split == "train":
         data_split = dataset.sample(frac=0.8, random_state=42)
@@ -220,7 +220,7 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
     #     dataset = tqdm.tqdm(dataset, desc='Processing SHP')
 
     data = Dataset('shp')
-    nrows = len(data_split.index)
+    nrows = len(dataset.index)
     score_threshold = 2.0
     
 
@@ -242,6 +242,8 @@ def get_shp(split: str, human_prefix: str, human_suffix: str, assistant_prefix: 
         data[prompt].sft_index = 0  # absolute best response cannot be inferred, so just pick the first
         data[prompt].dataset_name = 'shp'
         data[prompt].remove_extra_spaces()
+        print(data[prompt])
+        break
 
     # prevent over-fitting
     # if split == 'train':
@@ -499,7 +501,7 @@ class DataLoader:
         for name in dataset_names:
             dataset = globals()[f"get_{name}"](split, human_prefix, human_suffix, assistant_prefix, assistant_suffix)
             self.full_data.update(dataset.data)
-            print(f"len of full data keys {len(list(self.full_data.keys()))}")
+            print(list(self.full_data.keys())[:5])
 
     def collate(self, batch: Dict[str, List]) -> Dict:
         """
@@ -869,8 +871,7 @@ class UnpairedPreferenceDataLoader(DataLoader):
         return flat_data
 
     def __iter__(self):
-        prompts = list(self.full_data.keys())
-        print(f"len of prompts: {len(prompts)}")
+        prompts = list(self.full_data.keys()) 
         random.shuffle(prompts) # otherwise, will be frontloaded with prompts in same domain
         flat_data = self.get_flat_data(prompts)
 
@@ -883,21 +884,17 @@ class UnpairedPreferenceDataLoader(DataLoader):
             random.shuffle(flat_data)   # so generations in the same preference are not in the same batch
             batch = []
             example_queue = []
-            print(f"flat data: {flat_data}")
 
             for example, generation, status in flat_data:
-          
-                print(f"\n example: {example} \n ")
                 batch_element = self.tokenize_batch_element(example.prompt, generation, example.truncation_mode, prefix='target')
                 batch_element['status'] = status 
                 batch_element['truncation_mode'] = example.truncation_mode
                 example_queue.append(batch_element)
-                print(f"batch_element: {batch_element}")
                 
+
                 if len(example_queue) >= self.batch_size:
                     while len(batch) < self.batch_size:
                         batch.append(example_queue.pop(0))
-                print(f"batch = {batch}")
                     
                 if len(batch) >= self.batch_size:
                     # for estimating the KL term, match up x and y' that are not corresponding input-output pairs in the data
@@ -913,10 +910,8 @@ class UnpairedPreferenceDataLoader(DataLoader):
                         ))
 
                     example_idx += len(batch)
-                    # print(f"batch shape: {batch[0].shape}")
                     yield self.collate(batch)
-                    
-                  
+                    batch = []
 
                     if self.n_examples is not None and example_idx >= self.n_examples:
                         rank0_print(f'Finished generating {example_idx} examples on {self.split} split')
@@ -927,8 +922,7 @@ class UnpairedPreferenceDataLoader(DataLoader):
             # if self.n_epochs is not None and epoch_idx >= self.n_epochs:
             #     done = True
             #     break
-        
-            if epoch_idx >= 1:
+            if epoch_idx >= self.n_epochs:
                 done = True
                 break
 
@@ -942,7 +936,7 @@ class ScoreUnaryDataLoader(UnpairedPreferenceDataLoader):
         flat_data = []
         # prev_status = 'rejected'
         print("Creating flat data from ScoreUnaryDataLoader")
-        print(f"len of prompts: {len(prompts)} \n ")
+
         for prompt in prompts:
             example = self.full_data[prompt]
 
@@ -950,10 +944,13 @@ class ScoreUnaryDataLoader(UnpairedPreferenceDataLoader):
             #     example.pairs = random.sample(example.pairs, min(self.max_prompt_count, len(example.pairs)))
 
             # for oasst, lower scores are better, so rank 0 is the best response and rank n is the worst
-            print(example.desirable)
             if example.desirable:
+                print(example)
+                print(example.generations)
                 flat_data.append((example, example.generations[0], 'chosen'))
             else:
+                print(example)
+                print(example.generations)
                 flat_data.append((example, example.generations[0], 'rejected'))
 
 
