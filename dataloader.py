@@ -499,7 +499,7 @@ class DataLoader:
         for name in dataset_names:
             dataset = globals()[f"get_{name}"](split, human_prefix, human_suffix, assistant_prefix, assistant_suffix)
             self.full_data.update(dataset.data)
-            print(f"len of full data keys {len(list(self.full_data.keys()))}")
+            # print(f"len of full data keys {len(list(self.full_data.keys()))}")
 
     def collate(self, batch: Dict[str, List]) -> Dict:
         """
@@ -870,7 +870,7 @@ class UnpairedPreferenceDataLoader(DataLoader):
 
     def __iter__(self):
         prompts = list(self.full_data.keys())
-        print(f"len of prompts: {len(prompts)}")
+        # print(f"len of prompts: {len(prompts)}")
         random.shuffle(prompts) # otherwise, will be frontloaded with prompts in same domain
         flat_data = self.get_flat_data(prompts)
 
@@ -883,21 +883,21 @@ class UnpairedPreferenceDataLoader(DataLoader):
             random.shuffle(flat_data)   # so generations in the same preference are not in the same batch
             batch = []
             example_queue = []
-            print(f"flat data: {flat_data}")
+            # print(f"flat data: {flat_data}")
 
             for example, generation, status in flat_data:
           
-                print(f"\n example: {example} \n ")
+                # print(f"\n example: {example} \n ")
                 batch_element = self.tokenize_batch_element(example.prompt, generation, example.truncation_mode, prefix='target')
                 batch_element['status'] = status 
                 batch_element['truncation_mode'] = example.truncation_mode
                 example_queue.append(batch_element)
-                print(f"batch_element: {batch_element}")
+                # print(f"batch_element: {batch_element}")
                 
                 if len(example_queue) >= self.batch_size:
                     while len(batch) < self.batch_size:
                         batch.append(example_queue.pop(0))
-                print(f"batch = {batch}")
+                # print(f"batch = {batch}")
                     
                 if len(batch) >= self.batch_size:
                     # for estimating the KL term, match up x and y' that are not corresponding input-output pairs in the data
@@ -941,8 +941,8 @@ class ScoreUnaryDataLoader(UnpairedPreferenceDataLoader):
         """
         flat_data = []
         # prev_status = 'rejected'
-        print("Creating flat data from ScoreUnaryDataLoader")
-        print(f"len of prompts: {len(prompts)} \n ")
+        # print("Creating flat data from ScoreUnaryDataLoader")
+        # print(f"len of prompts: {len(prompts)} \n ")
         for prompt in prompts:
             example = self.full_data[prompt]
 
@@ -950,7 +950,7 @@ class ScoreUnaryDataLoader(UnpairedPreferenceDataLoader):
             #     example.pairs = random.sample(example.pairs, min(self.max_prompt_count, len(example.pairs)))
 
             # for oasst, lower scores are better, so rank 0 is the best response and rank n is the worst
-            print(example.desirable)
+            # print(example.desirable)
             if example.desirable:
                 flat_data.append((example, example.generations[0], 'chosen'))
             else:
