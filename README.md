@@ -1,5 +1,60 @@
+# KTO: Model Alignment as Prospect Theoretic Optimization (CS-769 Course Project)
+By: Anup Nagdeve, 200010011 | Ninad Chaphekar, 200010016 | Lyric Khare, 20d170022
 
-# Human-Aware Loss Functions (HALOs) :innocent:
+## Key Changes:
+- A new dataloader for Custom-Unpreferenced-Dataset
+- Changing the weights of desirable and undesirable by using the scores of each output from custom-dataset
+
+## New Dataloader
+In dataloader.py we modified the get_shp itself, as creating a new get_data function was creating some conflit in the configs
+ ```
+dataset = pd.read_csv("/content/drive/MyDrive/train.csv")
+    dataset = dataset[['orig_response', 'orig_instruction', 'orig_score']][:1024]
+    dataset = dataset.dropna()
+    if split == "train":
+        data_split = dataset.sample(frac=0.8, random_state=42)
+    elif split == "test":
+        data_split = dataset.sample(frac=0.2, random_state=42)
+
+    # if on_rank0():
+    #     dataset = tqdm.tqdm(dataset, desc='Processing SHP')
+
+    data = Dataset('shp')
+    nrows = len(data_split.index)
+    score_threshold = 2.0
+    
+
+    for i in range(nrows):
+        row = data_split.iloc[i]
+        prompt = human_prefix + row['orig_instruction'] + human_suffix + assistant_prefix
+        responses = row['orig_response']
+        score = row['orig_score']         
+        desired = False if score <= score_threshold else True
+        
+
+        # i,j = data[prompt].num_generations(), data[prompt].num_generations() + 1
+        data[prompt].prompt = prompt
+        data[prompt].generations.append(responses)
+        # data[prompt].pairs.append((i, j) if row['labels'] == 1 else (j, i))
+        data[prompt].scores = score
+        data[prompt].desirable.append(desired)
+        data[prompt].truncation_mode = 'keep_start' # keep start for SHP because it's single-turn with long prompts
+        data[prompt].sft_index = 0  # absolute best response cannot be inferred, so just pick the first
+        data[prompt].dataset_name = 'shp'
+        data[prompt].remove_extra_spaces()
+   ```
+- 1024 can be changed to a custom value to increase or decrease the size of training dataset
+- The path of train.csv has to be modified according to the local path
+
+## Desirable/Undersirable weights
+- Instead of sending desired or undesired, send score as a parameter (it is even defined in the Dataset class)
+- In trainers.py edit the batch['scores'] in train function in KTO trainer (if function is not defined there then create one from BasicTrainer)
+
+## Colab repository Link:
+- Replicating with custom dataset - <url>
+- Testing pythia1.4b vs KTO-pythia-1.4b - <url>
+
+# ReadMe of Parent Repo from ContexualAI:
 
 This repo allows you to design new **Human-Aware Loss Functions (HALOs)** for aligning LLMs with offline human feedback at scale (read more in our [technical report](assets/report.pdf) or our [full paper](https://arxiv.org/abs/2402.01306)).
 It was used to create Archangel, the largest-ever suite of human-feedback-aligned LLMs, and has been tested at scales from 1B to 30B.
